@@ -69,6 +69,8 @@
 
 package ca.nrc.cadc.tap.parser.converter;
 
+import ca.nrc.cadc.tap.parser.RegionFinder;
+import ca.nrc.cadc.tap.parser.region.function.OracleCentroid;
 import net.sf.jsqlparser.expression.BinaryExpression;
 import net.sf.jsqlparser.expression.DoubleValue;
 import net.sf.jsqlparser.expression.Expression;
@@ -82,25 +84,29 @@ import ca.nrc.cadc.tap.parser.region.function.OracleCircle;
 import ca.nrc.cadc.tap.parser.region.function.OraclePoint;
 
 import net.sf.jsqlparser.expression.LongValue;
+import net.sf.jsqlparser.expression.StringValue;
 import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
+import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.expression.operators.relational.NotEqualsTo;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 import org.junit.Test;
 import org.junit.Assert;
 
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 
 public class OracleRegionConverterTest {
 
     @Test
     public void handleContains() {
-
-        final OracleRegionConverter oracleRegionConverter = new OracleRegionConverter(new ExpressionNavigator(),
-                                                                                      new ReferenceNavigator(),
-                                                                                      new FromItemNavigator());
-
+        final OracleRegionConverter oracleRegionConverter = OracleRegionConverterTest.newTestSubject();
         final Expression left = new OraclePoint(new Point(16.8D, 33.4D));
-        final Expression right = new OracleCircle(new Circle(new Point(88.0D, 12.0D), 0.8D));
+        final Expression right = new OracleCircle(new Circle(new Point(88.0D, 12.0D), 0.8D),
+                                                  OracleRegionConverter.RELATE_DEFAULT_TOLERANCE);
         final Expression result = oracleRegionConverter.handleContains(left, right);
 
         assert result instanceof Function;
@@ -110,19 +116,17 @@ public class OracleRegionConverterTest {
         final String resultFunctionSource = resultFunction.toString();
         Assert.assertEquals("Wrong output.",
                             "SDO_CONTAINS(SDO_UTIL.CIRCLE_POLYGON(88.0, 12.0, "
-                            + 0.8D * OracleCircle.TO_METRES_ON_EARTH + ", 0.05), " +
+                            + 0.8D * OracleCircle.TO_METRES_ON_EARTH + ", 0.005), " +
                             "SDO_GEOMETRY(2001, 8307, SDO_POINT_TYPE(16.8, 33.4, NULL), NULL, NULL))",
                             resultFunctionSource);
     }
 
     @Test
     public void handleRegionPredicateContains() {
-        final OracleRegionConverter oracleRegionConverter = new OracleRegionConverter(new ExpressionNavigator(),
-                                                                                      new ReferenceNavigator(),
-                                                                                      new FromItemNavigator());
-
-        final Expression left = new OraclePoint(new Point(16.8D, 33.4D));
-        final Expression right = new OracleCircle(new Circle(new Point(88.0D, 12.0D), 0.8D));
+        final OracleRegionConverter oracleRegionConverter = OracleRegionConverterTest.newTestSubject();
+        final Expression left = new OraclePoint(new Point(11.9D, 13.4D));
+        final Expression right = new OracleCircle(new Circle(new Point(81.0D, 12.0D), 0.5D),
+                                                  OracleRegionConverter.RELATE_DEFAULT_TOLERANCE);
         final Expression containsFunction = oracleRegionConverter.handleContains(left, right);
 
         assert containsFunction instanceof Function;
@@ -140,19 +144,16 @@ public class OracleRegionConverterTest {
 
         final String resultFunctionSource = equalsFunction.toString();
         Assert.assertEquals("Wrong output.",
-                            "SDO_CONTAINS(SDO_UTIL.CIRCLE_POLYGON(88.0, 12.0, "
-                            + 0.8D * OracleCircle.TO_METRES_ON_EARTH + ", 0.05), " +
+                            "SDO_CONTAINS(SDO_UTIL.CIRCLE_POLYGON(81.0, 12.0, "
+                            + 0.5D * OracleCircle.TO_METRES_ON_EARTH + ", 0.005), " +
                             "SDO_GEOMETRY"
-                            + "(2001, 8307, SDO_POINT_TYPE(16.8, 33.4, NULL), NULL, NULL)) = 'TRUE'",
+                            + "(2001, 8307, SDO_POINT_TYPE(11.9, 13.4, NULL), NULL, NULL)) = 'TRUE'",
                             resultFunctionSource);
     }
 
     @Test
     public void handleColumnReferenceContains() {
-        final OracleRegionConverter oracleRegionConverter = new OracleRegionConverter(new ExpressionNavigator(),
-                                                                                      new ReferenceNavigator(),
-                                                                                      new FromItemNavigator());
-
+        final OracleRegionConverter oracleRegionConverter = OracleRegionConverterTest.newTestSubject();
         final Expression left = new OraclePoint(new Point(88.0D, 12.0D));
         final Expression right = new Column(new Table(), "s_region");
         final Expression distanceFunction = oracleRegionConverter.handleContains(left, right);
@@ -167,10 +168,7 @@ public class OracleRegionConverterTest {
 
     @Test
     public void handleColumnReferenceInside() {
-        final OracleRegionConverter oracleRegionConverter = new OracleRegionConverter(new ExpressionNavigator(),
-                                                                                      new ReferenceNavigator(),
-                                                                                      new FromItemNavigator());
-
+        final OracleRegionConverter oracleRegionConverter = OracleRegionConverterTest.newTestSubject();
         final Expression left = new Column(new Table(), "s_region");
         final Expression right = new OraclePoint(new Point(14.0D, -2.0D));
         final Expression distanceFunction = oracleRegionConverter.handleContains(left, right);
@@ -185,31 +183,27 @@ public class OracleRegionConverterTest {
 
     @Test
     public void handleColumnReference() {
-        final OracleRegionConverter oracleRegionConverter = new OracleRegionConverter(new ExpressionNavigator(),
-                                                                                      new ReferenceNavigator(),
-                                                                                      new FromItemNavigator());
-
+        final OracleRegionConverter oracleRegionConverter = OracleRegionConverterTest.newTestSubject();
         final Expression left = new OraclePoint(new Column(new Table(), "ra"),
                                                 new Column(new Table(), "dec"));
-        final Expression right = new OracleCircle(new Circle(new Point(88.0D, 12.0D), 0.8D));
+        final Expression right = new OracleCircle(new Circle(new Point(88.0D, 12.0D), 0.8D),
+                                                  OracleRegionConverter.RELATE_DEFAULT_TOLERANCE);
         final Expression distanceFunction = oracleRegionConverter.handleDistance(left, right);
 
         assert distanceFunction instanceof Function;
 
         Assert.assertEquals("Wrong SQL DISTANCE output.",
                             "SDO_GEOM.SDO_DISTANCE(SDO_GEOMETRY(2001, 8307, SDO_POINT_TYPE(ra, dec, NULL), NULL, " +
-                            "NULL), SDO_UTIL.CIRCLE_POLYGON(88.0, 12.0, " + 0.8D * OracleCircle.TO_METRES_ON_EARTH + ", 0.05), 0.05)",
+                            "NULL), SDO_UTIL.CIRCLE_POLYGON(88.0, 12.0, " + 0.8D * OracleCircle.TO_METRES_ON_EARTH + ", 0.005), 0.005)",
                             distanceFunction.toString());
     }
 
     @Test
     public void handleRegionPredicateIntersects() {
-        final OracleRegionConverter oracleRegionConverter = new OracleRegionConverter(new ExpressionNavigator(),
-                                                                                      new ReferenceNavigator(),
-                                                                                      new FromItemNavigator());
-
-        final Expression left = new OraclePoint(new Point(16.8D, 33.4D));
-        final Expression right = new OracleCircle(new Circle(new Point(88.0D, 12.0D), 0.8D));
+        final OracleRegionConverter oracleRegionConverter = OracleRegionConverterTest.newTestSubject();
+        final Expression left = new OraclePoint(new Point(6.8D, 36.4D));
+        final Expression right = new OracleCircle(new Circle(new Point(88.0D, 12.0D), 0.8D),
+                                                  OracleRegionConverter.RELATE_DEFAULT_TOLERANCE);
         final Expression intersectsFunction = oracleRegionConverter.handleIntersects(left, right);
 
         assert intersectsFunction instanceof Function;
@@ -228,19 +222,16 @@ public class OracleRegionConverterTest {
         final String resultFunctionSource = equalsFunction.toString();
         Assert.assertEquals("Wrong output.",
                             "SDO_GEOM.RELATE(SDO_UTIL.CIRCLE_POLYGON(88.0, 12.0, "
-                            + 0.8D * OracleCircle.TO_METRES_ON_EARTH + ", 0.05), " +
+                            + 0.8D * OracleCircle.TO_METRES_ON_EARTH + ", 0.005), " +
                             "'anyinteract', " +
-                            "SDO_GEOMETRY(2001, 8307, SDO_POINT_TYPE(16.8, 33.4, NULL), NULL, NULL), 0.05) " +
+                            "SDO_GEOMETRY(2001, 8307, SDO_POINT_TYPE(6.8, 36.4, NULL), NULL, NULL), 0.005) " +
                             "<> 'TRUE'",
                             resultFunctionSource);
     }
 
     @Test
     public void handleColumnReferenceIntersects() {
-        final OracleRegionConverter oracleRegionConverter = new OracleRegionConverter(new ExpressionNavigator(),
-                                                                                      new ReferenceNavigator(),
-                                                                                      new FromItemNavigator());
-
+        final OracleRegionConverter oracleRegionConverter = OracleRegionConverterTest.newTestSubject();
         final Expression left = new OraclePoint(new Point(88.0D, 12.0D));
         final Expression right = new Column(new Table("ora", "table"), "shape");
         final Expression intersectsFunction = oracleRegionConverter.handleIntersects(left, right);
@@ -271,9 +262,7 @@ public class OracleRegionConverterTest {
         final double latitude = -29.86576111D;
         final double radius = 0.0d;
 
-        final OracleRegionConverter oracleRegionConverter = new OracleRegionConverter(new ExpressionNavigator(),
-                                                                                      new ReferenceNavigator(),
-                                                                                      new FromItemNavigator());
+        final OracleRegionConverter oracleRegionConverter = OracleRegionConverterTest.newTestSubject();
 
         final Expression left = oracleRegionConverter.handleCircle(null,
                                                                    new DoubleValue(Double.toString(longitude)),
@@ -304,11 +293,10 @@ public class OracleRegionConverterTest {
 
     @Test
     public void handleDistance() {
-        final OracleRegionConverter oracleRegionConverter = new OracleRegionConverter(new ExpressionNavigator(),
-                                                                                      new ReferenceNavigator(),
-                                                                                      new FromItemNavigator());
+        final OracleRegionConverter oracleRegionConverter = OracleRegionConverterTest.newTestSubject();
 
-        final Expression left = new OracleCircle(new Circle(new Point(88.0D, 12.0D), 0.8D));
+        final Expression left = new OracleCircle(new Circle(new Point(88.0D, 12.0D), 0.8D),
+                                                 OracleRegionConverter.RELATE_DEFAULT_TOLERANCE);
         final Expression right = new OraclePoint(new Point(16.8D, 33.4D));
         final Expression distanceFunction = oracleRegionConverter.handleDistance(left, right);
 
@@ -316,8 +304,46 @@ public class OracleRegionConverterTest {
 
         Assert.assertEquals("Wrong SQL DISTANCE output.",
                             "SDO_GEOM.SDO_DISTANCE(SDO_UTIL.CIRCLE_POLYGON(88.0, 12.0, "
-                            + 0.8D * OracleCircle.TO_METRES_ON_EARTH + ", 0.05), " +
-                            "SDO_GEOMETRY(2001, 8307, SDO_POINT_TYPE(16.8, 33.4, NULL), NULL, NULL), 0.05)",
+                            + 0.8D * OracleCircle.TO_METRES_ON_EARTH + ", 0.005), " +
+                            "SDO_GEOMETRY(2001, 8307, SDO_POINT_TYPE(16.8, 33.4, NULL), NULL, NULL), 0.005)",
                             distanceFunction.toString());
+    }
+
+    @Test
+    public void handlePointSpecialCentroid() {
+        final OracleRegionConverter oracleRegionConverter = OracleRegionConverterTest.newTestSubject();
+
+        final Column raColumn = new Column(new Table(), "s_ra");
+        final Column decColumn = new Column(new Table(), "s_dec");
+
+        final Expression centroidFunction = oracleRegionConverter.handlePoint(new StringValue("icrs"),
+                                                                              raColumn, decColumn);
+        assert centroidFunction instanceof Function;
+
+        Assert.assertEquals("Wrong SQL CENTROID output",
+                            OracleCentroid.CENTROID_FUNCTION_NAME + "(s_region, 0.005)",
+                            centroidFunction.toString());
+    }
+
+    @Test
+    public void handleCentroid() {
+        final OracleRegionConverter oracleRegionConverter = OracleRegionConverterTest.newTestSubject();
+        final Column myColumn = new Column(new Table(), "SPECIAL_CIRCLE");
+        final Function function = new Function();
+        function.setName(RegionFinder.CENTROID);
+
+        final ExpressionList parameterExpressionList = new ExpressionList(Collections.singletonList(myColumn));
+        function.setParameters(parameterExpressionList);
+
+        final Expression centroidFunction = oracleRegionConverter.handleCentroid(function);
+        assert centroidFunction instanceof Function;
+
+        Assert.assertEquals("Wrong SQL CENTROID output",
+                            OracleCentroid.CENTROID_FUNCTION_NAME + "(SPECIAL_CIRCLE, 0.005)",
+                            centroidFunction.toString());
+    }
+
+    private static OracleRegionConverter newTestSubject() {
+        return new OracleRegionConverter(new ExpressionNavigator(), new ReferenceNavigator(), new FromItemNavigator());
     }
 }

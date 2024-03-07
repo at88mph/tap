@@ -69,6 +69,7 @@
 
 package ca.nrc.cadc.tap.parser.region.function;
 
+import ca.nrc.cadc.tap.parser.converter.OracleRegionConverter;
 import net.sf.jsqlparser.expression.DoubleValue;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
@@ -90,7 +91,8 @@ public class OracleCircleTest extends AbstractFunctionTest {
         final Expression longitude = new DoubleValue(Double.toString(3.4D));
         final Expression latitude = new DoubleValue(Double.toString(88.5D));
         final Expression radiusInDegrees = new DoubleValue(Double.toString(0.7D));
-        final OracleCircle testSubject = new OracleCircle(longitude, latitude, radiusInDegrees);
+        final OracleCircle testSubject = new OracleCircle(longitude, latitude, radiusInDegrees,
+                                                          OracleRegionConverter.RELATE_DEFAULT_TOLERANCE);
 
         final ExpressionList result = testSubject.getParameters();
         final List<Expression> resultExpressions = result.getExpressions();
@@ -99,7 +101,7 @@ public class OracleCircleTest extends AbstractFunctionTest {
         expectedExpressions.add(longitude);
         expectedExpressions.add(latitude);
         expectedExpressions.add(new DoubleValue(Double.toString(OracleCircle.TO_METRES_ON_EARTH * 0.7D)));
-        expectedExpressions.add(new DoubleValue(Double.toString(OracleCircle.DEFAULT_ARC_TOLERANCE)));
+        expectedExpressions.add(new DoubleValue(OracleRegionConverter.RELATE_DEFAULT_TOLERANCE));
 
         Assert.assertEquals("Wrong name.", OracleCircle.FUNCTION_NAME, testSubject.getName());
         assertResultExpressions(expectedExpressions, resultExpressions);
@@ -113,7 +115,8 @@ public class OracleCircleTest extends AbstractFunctionTest {
         final double radius = 5.0d;
 
         final OracleCircle testSubject = new OracleCircle(new Circle(new Point(longitude, latitude),
-                                                                     radius));
+                                                                     radius),
+                                                          OracleRegionConverter.RELATE_DEFAULT_TOLERANCE);
         final ExpressionList result = testSubject.getParameters();
         final List<Expression> resultExpressions = result.getExpressions();
         final List<Expression> expectedExpressions = new ArrayList<>();
@@ -121,7 +124,7 @@ public class OracleCircleTest extends AbstractFunctionTest {
         expectedExpressions.add(new DoubleValue(Double.toString(longitude)));
         expectedExpressions.add(new DoubleValue(Double.toString(latitude)));
         expectedExpressions.add(new DoubleValue(Double.toString(OracleCircle.TO_METRES_ON_EARTH * 5.0D)));
-        expectedExpressions.add(new DoubleValue(Double.toString(OracleCircle.DEFAULT_ARC_TOLERANCE)));
+        expectedExpressions.add(new DoubleValue(OracleRegionConverter.RELATE_DEFAULT_TOLERANCE));
 
         Assert.assertEquals("Wrong name.", OracleCircle.FUNCTION_NAME, testSubject.getName());
         assertResultExpressions(expectedExpressions, resultExpressions);
@@ -131,7 +134,8 @@ public class OracleCircleTest extends AbstractFunctionTest {
     @SuppressWarnings("unchecked")
     public void convertParametersFromCircle() {
         final OracleCircle testSubject = new OracleCircle(new Circle(new Point(65.78D, 34.56D),
-                                                                     0.15D));
+                                                                     0.15D),
+                                                          OracleRegionConverter.RELATE_DEFAULT_TOLERANCE);
         final ExpressionList result = testSubject.getParameters();
         final List<Expression> resultExpressions = result.getExpressions();
         final List<Expression> expectedExpressions = new ArrayList<>();
@@ -139,7 +143,7 @@ public class OracleCircleTest extends AbstractFunctionTest {
         expectedExpressions.add(new DoubleValue(Double.toString(65.78D)));
         expectedExpressions.add(new DoubleValue(Double.toString(34.56D)));
         expectedExpressions.add(new DoubleValue(Double.toString(OracleCircle.TO_METRES_ON_EARTH * 0.15D)));
-        expectedExpressions.add(new DoubleValue(Double.toString(OracleCircle.DEFAULT_ARC_TOLERANCE)));
+        expectedExpressions.add(new DoubleValue(OracleRegionConverter.RELATE_DEFAULT_TOLERANCE));
 
         Assert.assertEquals("Wrong name.", OracleCircle.FUNCTION_NAME, testSubject.getName());
         assertResultExpressions(expectedExpressions, resultExpressions);

@@ -73,6 +73,7 @@ package ca.nrc.cadc.tap.parser.region.function;
 import ca.nrc.cadc.dali.Circle;
 import ca.nrc.cadc.dali.Point;
 
+import ca.nrc.cadc.tap.parser.converter.OracleRegionConverter;
 import net.sf.jsqlparser.expression.DoubleValue;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
@@ -87,7 +88,9 @@ public class OracleDistanceTest extends AbstractFunctionTest {
     @SuppressWarnings("unchecked")
     public void convertParameters() {
         final OraclePoint oraclePointLeft = new OraclePoint(new Point(22.8D, 44.9D));
-        final OracleCircle oracleCircleRight = new OracleCircle(new Circle(new Point(13.0D, 14.6D), 0.4D));
+        final OracleCircle oracleCircleRight =
+                new OracleCircle(new Circle(new Point(13.0D, 14.6D), 0.4D),
+                                 OracleRegionConverter.RELATE_DEFAULT_TOLERANCE);
         final OracleDistance testSubject = new OracleDistance(oraclePointLeft, oracleCircleRight, "0.06");
 
         final ExpressionList result = testSubject.getParameters();

@@ -79,11 +79,13 @@ import ca.nrc.cadc.tap.parser.navigator.ExpressionNavigator;
 import ca.nrc.cadc.tap.parser.navigator.FromItemNavigator;
 import ca.nrc.cadc.tap.parser.navigator.ReferenceNavigator;
 import ca.nrc.cadc.tap.parser.region.function.OracleBox;
+import ca.nrc.cadc.tap.parser.region.function.OracleCentroid;
 import ca.nrc.cadc.tap.parser.region.function.OracleCircle;
 import ca.nrc.cadc.tap.parser.region.function.OracleDistance;
 import ca.nrc.cadc.tap.parser.region.function.OraclePoint;
 import ca.nrc.cadc.tap.parser.region.function.OraclePolygon;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -116,10 +118,14 @@ public class OracleRegionConverter extends RegionFinder {
     private static final String CONTAINS_TRUE_VALUE = CONTAINS_RELATE_MASK.toUpperCase();
     private static final String ANYINTERACT_FUNCTION_NAME = "SDO_ANYINTERACT";
     private static final String ANYINTERACT_RELATE_MASK = "anyinteract";
-    private static final String RELATE_DEFAULT_TOLERANCE = "0.05";
+    private static final String RA_COLUMN_NAME = "s_ra";
+    private static final String DEC_COLUMN_NAME = "s_dec";
+    private static final String REGION_COLUMN_NAME = "s_region";
 
     // Prototype coordinate range function using Oracle's SDO_GEOM package.
     public static final String RANGE_S2D = "RANGE_S2D";
+
+    public static final String RELATE_DEFAULT_TOLERANCE = "0.005";  // 5mm
 
     private static final Logger LOGGER = Logger.getLogger(OracleRegionConverter.class);
 
@@ -266,7 +272,7 @@ public class OracleRegionConverter extends RegionFinder {
      */
     @Override
     protected Expression handleDistance(final Expression left, final Expression right) {
-        return new OracleDistance(left, right, RELATE_DEFAULT_TOLERANCE);
+        return new OracleDistance(left, right, OracleRegionConverter.RELATE_DEFAULT_TOLERANCE);
     }
 
     /**
@@ -347,7 +353,25 @@ public class OracleRegionConverter extends RegionFinder {
      */
     @Override
     protected Expression handlePoint(Expression coordsys, Expression ra, Expression dec) {
-        return new OraclePoint(ra, dec);
+        // Special case where requesting a POINT(ra, dec) should actually be a CENTROID function
+        // of the S_REGION column.
+        if (ra instanceof Column && dec instanceof Column
+            && ((Column) ra).getColumnName().equalsIgnoreCase(OracleRegionConverter.RA_COLUMN_NAME)
+            && ((Column) dec).getColumnName().equalsIgnoreCase(OracleRegionConverter.DEC_COLUMN_NAME)) {
+            final Function centroidFunction = new Function();
+            centroidFunction.setName(OracleRegionConverter.CENTROID);
+
+            final ExpressionList functionParameters = new ExpressionList();
+            final List<Object> functionParameterExpressions = new ArrayList<>();
+            functionParameterExpressions.add(new Column(((Column) ra).getTable(),
+                                                        OracleRegionConverter.REGION_COLUMN_NAME));
+            functionParameters.setExpressions(functionParameterExpressions);
+
+            centroidFunction.setParameters(functionParameters);
+            return handleCentroid(centroidFunction);
+        } else {
+            return new OraclePoint(ra, dec);
+        }
     }
 
     /**
@@ -357,7 +381,7 @@ public class OracleRegionConverter extends RegionFinder {
     protected Expression handleCircle(Expression coordsys, Expression ra, Expression dec, Expression radius) {
         final double parsedRadius = Double.parseDouble(radius.toString());
         if (parsedRadius > 0.0D) {
-            return new OracleCircle(ra, dec, radius);
+            return new OracleCircle(ra, dec, radius, OracleRegionConverter.RELATE_DEFAULT_TOLERANCE);
         } else {
             LOGGER.debug("Radius is missing or is 0.0.  Returning a POINT instead.");
             return handlePoint(coordsys, ra, dec);
@@ -382,7 +406,7 @@ public class OracleRegionConverter extends RegionFinder {
      */
     @Override
     protected Expression handleCentroid(Function adqlFunction) {
-        throw new UnsupportedOperationException("CENTROID");
+        return new OracleCentroid(adqlFunction, OracleRegionConverter.RELATE_DEFAULT_TOLERANCE);
     }
 
     /**

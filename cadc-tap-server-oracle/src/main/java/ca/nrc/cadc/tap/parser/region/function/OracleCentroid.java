@@ -1,10 +1,9 @@
-
 /*
  ************************************************************************
  *******************  CANADIAN ASTRONOMY DATA CENTRE  *******************
  **************  CENTRE CANADIEN DE DONNÉES ASTRONOMIQUES  **************
  *
- *  (c) 2019.                            (c) 2019.
+ *  (c) 2024.                            (c) 2024.
  *  Government of Canada                 Gouvernement du Canada
  *  National Research Council            Conseil national de recherches
  *  Ottawa, Canada, K1A 0R6              Ottawa, Canada, K1A 0R6
@@ -69,69 +68,30 @@
 
 package ca.nrc.cadc.tap.parser.region.function;
 
-import ca.nrc.cadc.dali.Circle;
-import ca.nrc.cadc.tap.parser.converter.OracleRegionConverter;
-
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-
 import net.sf.jsqlparser.expression.DoubleValue;
-import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.Function;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 
-import org.apache.log4j.Logger;
+import java.util.ArrayList;
+import java.util.List;
+
+public class OracleCentroid extends Function {
+    public static final String CENTROID_FUNCTION_NAME = "SDO_GEOM.SDO_CENTROID";
 
 
-public class OracleCircle extends Function {
+    public OracleCentroid(final Function adqlFunction, final String tolerance) {
+        if (adqlFunction.getParameters() == null) {
+            throw new IllegalArgumentException("Nothing to put into the CENTROID function.");
+        }
 
-    private static final Logger LOGGER = Logger.getLogger(OracleRegionConverter.class);
+        setName(OracleCentroid.CENTROID_FUNCTION_NAME);
+        final ExpressionList functionParameters = new ExpressionList();
 
-    public static final String FUNCTION_NAME = "SDO_UTIL.CIRCLE_POLYGON";
-    public static final double TO_METRES_ON_EARTH = 2.0D * Math.PI * 6371000.0D / 360.0D;
+        final List<Object> functionParameterList = new ArrayList<>(adqlFunction.getParameters().getExpressions());
+        functionParameterList.add(new DoubleValue(tolerance));
 
+        functionParameters.setExpressions(functionParameterList);
 
-    public OracleCircle(final Expression ra, final Expression dec, final Expression radiusInDegrees,
-                        final String tolerance) {
-        super();
-
-        setName(FUNCTION_NAME);
-
-        setParameters(new ExpressionList(new ArrayList<>()));
-
-        // Oracle GEO CIRCLE
-        final List<Expression> expressions = getParameters().getExpressions();
-
-        // Longitude
-        expressions.add(ra);
-
-        // Latitude
-        expressions.add(dec);
-
-        // Radius in metres
-        expressions.add(new DoubleValue(Double.toString(Double.parseDouble(radiusInDegrees.toString())
-                                                        * TO_METRES_ON_EARTH)));
-
-        // Arc tolerance
-        expressions.add(new DoubleValue(tolerance));
-    }
-
-    public OracleCircle(final Circle circle, final String tolerance) {
-        this(new DoubleValue(Double.toString(circle.getCenter().getLongitude())),
-             new DoubleValue(Double.toString(circle.getCenter().getLatitude())),
-             new DoubleValue(Double.toString(circle.getRadius())),
-             tolerance);
-    }
-
-    /**
-     * Determine whether this shape matches the types provided by the structTypeArray.  The individual types should
-     * have an array of numbers to compare.
-     *
-     * @param structTypeArray The numerical array from the database to check for.
-     * @return True if the numbers match, False otherwise.
-     */
-    public static boolean structMatches(final BigDecimal[] structTypeArray) {
-        return structTypeArray == null;
+        setParameters(functionParameters);
     }
 }
